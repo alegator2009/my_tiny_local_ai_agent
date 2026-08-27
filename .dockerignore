@@ -1,0 +1,24 @@
+# Exclude the evolution self-improvement sandboxes from the build
+# context (and from the API volume mount).  They are big and not
+# needed to run the app.
+evolution
+chunks
+
+# Local caches
+.git
+.gitignore
+node_modules
+.next
+out
+dist
+
+# IDE / OS
+.DS_Store
+.idea
+.vscode
+
+# Local data and secrets — the compose file mounts ./data explicitly
+# for the api service, so we don't want it baked into images either.
+data/*.db
+data/lancedb
+**/*.log

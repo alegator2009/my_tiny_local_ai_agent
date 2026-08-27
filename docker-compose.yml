@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+    container_name: ai_infinite_api
+    environment:
+      - DATA_DIR=/app/data
+      - APP_CONFIG_PATH=/app/data/config.json
+      - SQLITE_PATH=/app/data/app.db
+      - LANCEDB_PATH=/app/data/lancedb
+      - CORS_ALLOW_ORIGINS=http://localhost:3000
+      - EVOLUTION_REPO_ROOT=/workspace
+    volumes:
+      - ./data:/app/data
+      - ./mcp:/app/mcp
+      - ./skills:/app/skills
+      # Bind the API source so live edits to *.py are picked up by a
+      # `docker compose restart api` without rebuilding the image.
+      # Falls back to the COPY in the Dockerfile when the host file
+      # is missing (e.g. when bind-mounting a sparse checkout).
+      - ./apps/api/app:/app/app
+      - .:/workspace
+    ports:
+      - '8000:8000'
+
+  web:
+    build:
+      context: ./apps/web
+    container_name: ai_infinite_web
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Run Next.js dev server inside the container so live edits to
+      # `apps/web/**` on the host are picked up via HMR without rebuilding
+      # the image. Falls back to the COPY in the Dockerfile if the bind
+      # mount is unavailable. ``pnpm`` is enabled via corepack in the
+      # Dockerfile; the same binary works in dev mode here.
+      - NODE_ENV=development
+      - COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    command: ["pnpm", "run", "dev"]
+    volumes:
+      # Bind the source so live edits on the host are reflected in the
+      # container's Next.js dev server. node_modules and .next are kept
+      # inside the container to avoid host-platform incompatibilities.
+      - ./apps/web/app:/app/app
+      - ./apps/web/components:/app/components
+      - ./apps/web/lib:/app/lib
+      - ./apps/web/types:/app/types
+      - ./apps/web/public:/app/public
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api

@@ -1,0 +1,15 @@
+{
+  "name": "ai-infinite-session",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/schemas"
+  ],
+  "scripts": {
+    "dev:web": "node scripts/active-web-dev.mjs",
+    "dev:active-web": "node scripts/active-web-dev.mjs",
+    "dev:web:root": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "start:web": "npm --workspace apps/web run start"
+  }
+}

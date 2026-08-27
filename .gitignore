@@ -1,0 +1,99 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Data and runtime artifacts
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.pid
+.playwright-mcp/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# TypeScript build artefacts (one-off, never commit)
+*.tsbuildinfo
+tsc*.out
+$null
+
+# Lineage / self-evolution snapshots (kept locally, never committed)
+evolution/agent-*/
+evolution/lineage.jsonl
+
+# Local debug scripts / one-off dumps (kept out of the repo)
+chunks/
+client_bundle_old.js
+client_new.js
+client_ref.txt
+client_ref2.js
+globals_tail.txt
+page-cc069d035298fad8.js
+page.js
+server_index.html
+server_index2.html
+server_page_head.txt
+scripts/count_bundle.py
+scripts/count_client_bundle.py
+scripts/count_client_new.py
+scripts/grep_all_chunks.py
+scripts/grep_bundle.py
+scripts/list_client_modules.py
+scripts/rewrite_globals.py
+scripts/test_graph_endpoint.py
+scripts/add_graph_animations.ps1
+
+# One-off HTTP scrapes / raw HTML dumps from manual debugging
+*.html
+bing*.html
+ddg*.html
+mojeek.html
+startpage*.html
+
+# One-off Python inspect / debug scripts kept at repo root
+inspect*.py
+check*.py
+debug*.py
+clear_cache.py
+test_b64.py
+.t
+session_dump.py
+final_session_id.txt
+apps/api/inspect_last_session.py
+tracked.txt
+
+# Ad-hoc skill experiments (kept locally, not part of the shipping skills)
+skills/state.js
+skills/test-state.mjs
+skill_state_lab/
+
+# Test fixture JSON used for ad-hoc replay sessions
+agentic*.json
+agentic*_session_id.txt
+final_*.json
+final_*_session_id.txt
+replay*_*.json
+replay*_session_id.txt
+skill_state_lab/
+
+# Agent-only notes (for AI assistants working in this repo, not for end users)
+AGENTS.md
