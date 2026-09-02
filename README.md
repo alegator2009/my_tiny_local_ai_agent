@@ -131,8 +131,8 @@ Key entry points:
 ### With Docker Compose (recommended)
 
 ```bash
-git clone https://github.com/<your-org>/my_ai_agent.git
-cd my_ai_agent
+git clone https://github.com/<your-org>/my_tiny_local_ai_agent.git
+cd my_tiny_local_ai_agent
 cp .env.example .env             # then edit, if needed
 docker compose up --build
 ```
