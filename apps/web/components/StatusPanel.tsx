@@ -190,9 +190,15 @@ export default function StatusPanel(props: Props) {
   } = props;
 
   // Live tick: forces a re-render every second so "Xs ago" updates
-  // without us touching any data source.
-  const [now, setNow] = useState(() => Date.now());
+  // without us touching any data source.  The state is initialised
+  // to ``null`` and only filled in client-side after mount, so the
+  // server-rendered HTML always matches the first client render
+  // (avoids the classic "Text content does not match server-rendered
+  // HTML" hydration error caused by ``new Date()`` diverging between
+  // SSR and the browser).
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    setNow(Date.now());
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
@@ -259,10 +265,13 @@ export default function StatusPanel(props: Props) {
   // Live pulse: the top dot pulses green if the model is active in
   // the last ~3s, dim idle otherwise. We piggy-back on the lastEventAt
   // age — if we got a chat event very recently, we treat the system
-  // as "live".
-  const isLive = !!lastEventAt && now - lastEventAt.getTime() < 3000;
-  const age = formatAge(now, lastEventAt);
+  // as "live".  ``now`` is ``null`` until the first client tick, so we
+  // fall back to a stable placeholder on SSR / first paint to avoid
+  // hydration mismatch (server clock ≠ client clock).
+  const isLive = !!lastEventAt && now !== null && now - lastEventAt.getTime() < 3000;
+  const age = now === null ? '—' : formatAge(now, lastEventAt);
   const nowStr = useMemo(() => {
+    if (now === null) return '--:--:--';
     const d = new Date(now);
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');

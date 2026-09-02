@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { Session } from '@/lib/api';
 
@@ -23,6 +23,15 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
   const [titleDraft, setTitleDraft] = useState('');
   const [modeDraft, setModeDraft] = useState<'full' | 'skill_state'>('full');
   const [submitting, setSubmitting] = useState(false);
+  // ``mounted`` flips to true on the first client render.  We use it
+  // to delay rendering locale-sensitive strings (``toLocaleString``)
+  // until the client knows the user's timezone, otherwise the SSR
+  // output and the first client render disagree and React throws a
+  // hydration error.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const reset = () => {
     setTitleDraft('');
@@ -47,7 +56,9 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
           <li key={s.id} className={selectedSessionId === s.id ? 'active' : ''}>
             <button className="session-row" onClick={() => onSelect(s.id)}>
               <span>{s.title}</span>
-              <small>{new Date(s.updated_at).toLocaleString()}</small>
+              <small suppressHydrationWarning>
+                {mounted ? new Date(s.updated_at).toLocaleString() : ''}
+              </small>
             </button>
             <div className="session-actions">
               <button onClick={() => onArchive(s.id)}>Archive</button>

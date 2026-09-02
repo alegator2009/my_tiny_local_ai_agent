@@ -621,7 +621,7 @@ function LiveGraphInner({ sessionId, width, height, inFlight, lastEventAt, windo
           {graph.nodes.length} nodes · {graph.edges.length} edges
         </span>
         {lastEventAt ? (
-          <span className="lg-pulse" title={`Last event: ${lastEventAt.toLocaleTimeString()}`}>
+          <span className="lg-pulse" suppressHydrationWarning title={`Last event: ${lastEventAt.toLocaleTimeString()}`}>
             ● live
           </span>
         ) : null}

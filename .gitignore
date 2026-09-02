@@ -80,6 +80,14 @@ session_dump.py
 final_session_id.txt
 apps/api/inspect_last_session.py
 tracked.txt
+smoke_create.json
+smoke_msg.json
+smoke_sse.log
+smoke_session_id.txt
+agentic*_session_id.txt
+replay*session_id.txt
+*_sse.log
+docker-rebuild.log
 
 # Ad-hoc skill experiments (kept locally, not part of the shipping skills)
 skills/state.js

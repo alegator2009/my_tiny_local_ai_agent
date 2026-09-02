@@ -240,6 +240,16 @@ export default function ChatPanel({
     setThinkingMode(sessionThinkingMode);
   }, [sessionId, sessionProviderId, sessionModelId, sessionThinkingMode]);
 
+  // ``mounted`` flips to true on the first client render.  We use it
+  // to delay rendering locale-sensitive strings (``toLocaleTimeString``
+  // on message timestamps) until the client knows the user's timezone,
+  // otherwise the SSR output and the first client render disagree and
+  // React throws a hydration error.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Restore the chat-header checkboxes from the session row whenever
   // the user switches sessions.
   useEffect(() => {
@@ -940,7 +950,9 @@ export default function ChatPanel({
             <article key={m.id} className={`msg ${m.role}`}>
               <header>
                 <strong>{m.role}</strong>
-                <small>{new Date(m.timestamp).toLocaleTimeString()}</small>
+                <small suppressHydrationWarning>
+                  {mounted ? new Date(m.timestamp).toLocaleTimeString() : ''}
+                </small>
               </header>
               <div className="msg-content">
                 {m.role === 'assistant' || m.role === 'system' ? (
