@@ -26,9 +26,11 @@ export default function MemoryPage() {
 
   return (
     <main className="simple-page">
-      <header>
-        <h1>Memory Inspector</h1>
-        <Link href="/">Back</Link>
+      <header className="page-head">
+        <div>
+          <h1>Memory Inspector</h1>
+        </div>
+        <Link href="/" className="page-head-action">Back</Link>
       </header>
 
       <div style={{ display: 'flex', gap: 8 }}>

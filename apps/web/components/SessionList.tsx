@@ -203,7 +203,7 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
               className="status-field"
               style={{
                 display: 'block',
-                border: '1px solid var(--panel-border, #444)',
+                border: '1px solid var(--line)',
                 borderRadius: 6,
                 padding: 8,
                 marginBottom: 12
@@ -295,7 +295,7 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
                   }
                 }}
                 disabled={!titleDraft.trim() || submitting}
-                className="primary"
+                data-variant="primary"
               >
                 {submitting ? 'Creating…' : 'Create'}
               </button>

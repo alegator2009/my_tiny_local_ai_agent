@@ -39,26 +39,20 @@ interface Props {
 function contextStroke(percent: number, alpha = 0.85): string {
   const p = Math.max(0, Math.min(1, percent));
   // Stops:
-  //   0.00 -> (0, 255, 102)   matrix green
-  //   0.55 -> (255, 200, 60)  amber
-  //   0.80 -> (255, 110, 50)  orange
-  //   1.00 -> (170, 0, 0)     dark red
+  //   0.00 -> (107, 107, 107) muted grey
+  //   0.70 -> (180, 83, 9)    accent amber
+  //   1.00 -> (185, 28, 28)   danger red
   let r: number, g: number, b: number;
-  if (p < 0.55) {
-    const t = p / 0.55;
-    r = Math.round(0 + (255 - 0) * t);
-    g = Math.round(255 + (200 - 255) * t);
-    b = Math.round(102 + (60 - 102) * t);
-  } else if (p < 0.8) {
-    const t = (p - 0.55) / 0.25;
-    r = Math.round(255 + (255 - 255) * t);
-    g = Math.round(200 + (110 - 200) * t);
-    b = Math.round(60 + (50 - 60) * t);
+  if (p < 0.7) {
+    const t = p / 0.7;
+    r = Math.round(107 + (180 - 107) * t);
+    g = Math.round(107 + (83 - 107) * t);
+    b = Math.round(107 + (9 - 107) * t);
   } else {
-    const t = (p - 0.8) / 0.2;
-    r = Math.round(255 + (170 - 255) * t);
-    g = Math.round(110 + (0 - 110) * t);
-    b = Math.round(50 + (0 - 50) * t);
+    const t = (p - 0.7) / 0.3;
+    r = Math.round(180 + (185 - 180) * t);
+    g = Math.round(83 + (28 - 83) * t);
+    b = Math.round(9 + (28 - 9) * t);
   }
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
@@ -108,26 +102,27 @@ const CATEGORY_TAG: Record<string, string> = {
   artifact_created: 'ART',
 };
 
-// Outline accent color for prominent node types. Matrix-green stays
-// the default for everything, but the *outline* of prominent nodes
-// gets a category-specific color so the cognitive loop is visible at
-// a glance.
+// Outline accent for prominent node types. We use a small, restrained
+// palette that matches the warm-amber design system: text/muted greys
+// for the common types, accent for chat & checkpoints, warning for
+// shell, danger for errors. No cyan/purple/pink - those were the
+// loudest "AI demo" markers.
 const CATEGORY_COLOR: Record<string, string> = {
-  mcp_tool_call: 'rgba(177, 78, 255, 0.95)',     // purple
-  mcp_tool_result: 'rgba(177, 78, 255, 0.65)',
-  tool_call: 'rgba(0, 212, 255, 0.95)',         // cyan
-  tool_result: 'rgba(0, 212, 255, 0.6)',
-  terminal_command: 'rgba(255, 186, 92, 0.95)', // amber
-  terminal_output: 'rgba(255, 186, 92, 0.55)',
-  file_change: 'rgba(255, 222, 92, 0.95)',      // yellow
-  file_snapshot: 'rgba(255, 222, 92, 0.6)',
-  diff_summary: 'rgba(255, 222, 92, 0.85)',
-  test_result: 'rgba(135, 217, 154, 0.95)',     // green
-  build_error: 'rgba(255, 95, 95, 0.95)',       // red
-  image_created: 'rgba(255, 137, 222, 0.95)',   // pink
-  artifact_created: 'rgba(255, 137, 222, 0.85)',
-  checkpoint: 'rgba(0, 212, 255, 0.95)',
-  window: 'rgba(0, 255, 156, 0.95)',
+  mcp_tool_call: 'rgba(124, 90, 16, 0.95)',     // warning
+  mcp_tool_result: 'rgba(124, 90, 16, 0.65)',
+  tool_call: 'rgba(107, 107, 107, 0.95)',      // muted
+  tool_result: 'rgba(107, 107, 107, 0.6)',
+  terminal_command: 'rgba(124, 90, 16, 0.95)',  // warning
+  terminal_output: 'rgba(124, 90, 16, 0.55)',
+  file_change: 'rgba(26, 26, 26, 0.95)',        // text
+  file_snapshot: 'rgba(26, 26, 26, 0.6)',
+  diff_summary: 'rgba(107, 107, 107, 0.95)',    // muted
+  test_result: 'rgba(180, 83, 9, 0.95)',        // accent
+  build_error: 'rgba(185, 28, 28, 0.95)',       // danger
+  image_created: 'rgba(26, 26, 26, 0.95)',      // text
+  artifact_created: 'rgba(107, 107, 107, 0.85)', // muted
+  checkpoint: 'rgba(180, 83, 9, 0.95)',         // accent
+  window: 'rgba(180, 83, 9, 0.95)',            // accent
 };
 
 interface DotData extends Record<string, unknown> {
@@ -185,7 +180,7 @@ function CardNode({ data }: NodeProps) {
   const d = data as unknown as DotData;
   const w = d.radius * 4;
   const h = d.radius * 2.6;
-  const accent = d.accent || 'rgba(0, 255, 156, 0.95)';
+  const accent = d.accent || 'rgba(180, 83, 9, 0.95)';
   return (
     <div
       className="lg-card"
@@ -455,7 +450,7 @@ function LiveGraphInner({ sessionId, width, height, inFlight, lastEventAt, windo
           hover: hovered === tn.id,
           prominent: isProminent,
           tag: CATEGORY_TAG[tn.type] ?? '',
-          accent: CATEGORY_COLOR[tn.type] ?? 'rgba(0, 255, 156, 0.95)',
+          accent: CATEGORY_COLOR[tn.type] ?? 'rgba(180, 83, 9, 0.95)',
           // Render-time flags surfaced via data-attributes
           appear: isNew,
           stagger: staggerIndex(tn.id),
@@ -474,7 +469,7 @@ function LiveGraphInner({ sessionId, width, height, inFlight, lastEventAt, windo
       // and stay the base colour (they're frame-level and shouldn't
       // shout). Everything else takes the context colour.
       const stroke = isTool
-        ? 'rgba(0, 255, 102, 0.95)'
+        ? 'rgba(180, 83, 9, 0.95)'
         : isContains
         ? 'rgba(255, 255, 255, 0.18)'
         : isSummarizes
@@ -541,25 +536,46 @@ function LiveGraphInner({ sessionId, width, height, inFlight, lastEventAt, windo
     return () => clearTimeout(t);
   }, [appearTick]);
 
-  // Fit view once per session (and on size change if user hasn't interacted)
+  // Auto-fit behaviour:
+  // - When the graph changes (new nodes, new session, container resize) AND
+  //   the user has not yet panned/zoomed manually, fit the viewport to the
+  //   current nodes. This keeps the whole graph visible while it's growing.
+  // - Once the user pans or zooms, we stop auto-fitting — moving the camera
+  //   under them is jarring. A "Fit view" button appears in that state and
+  //   re-enables auto-fit when clicked.
+  const [userManipulatedView, setUserManipulatedView] = useState(false);
   const fittedRef = useRef<string | null>(null);
   useEffect(() => {
     if (nodes.length === 0) return;
+    if (userManipulatedView) return;
     if (fittedRef.current === sessionId) return;
     const t = setTimeout(() => {
       try {
-        reactFlow.fitView({ padding: 0.15, duration: 350 });
+        reactFlow.fitView({ padding: 0.18, duration: 300 });
       } catch {
         // ignore
       }
       fittedRef.current = sessionId;
     }, 200);
     return () => clearTimeout(t);
-  }, [sessionId, nodes.length, reactFlow]);
+  }, [sessionId, nodes.length, userManipulatedView, reactFlow]);
 
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     viewportRef.current = viewport;
+    // Mark the view as user-controlled. We don't reset this on every render;
+    // it stays true until the user explicitly clicks "Fit view".
+    setUserManipulatedView(true);
   }, []);
+
+  const onFitClick = useCallback(() => {
+    setUserManipulatedView(false);
+    fittedRef.current = null; // allow the next render to re-fit
+    try {
+      reactFlow.fitView({ padding: 0.18, duration: 300 });
+    } catch {
+      // ignore
+    }
+  }, [reactFlow]);
 
   const onNodeDrag = useCallback((_: unknown, n: Node) => {
     const r = (n.data as DotData).radius;
@@ -624,6 +640,17 @@ function LiveGraphInner({ sessionId, width, height, inFlight, lastEventAt, windo
           <span className="lg-pulse" suppressHydrationWarning title={`Last event: ${lastEventAt.toLocaleTimeString()}`}>
             ● live
           </span>
+        ) : null}
+        {userManipulatedView ? (
+          <button
+            type="button"
+            className="lg-fit-btn"
+            onClick={onFitClick}
+            title="Fit graph to view"
+            aria-label="Fit graph to view"
+          >
+            Fit view
+          </button>
         ) : null}
       </div>
       <div className="lg-canvas">
@@ -864,3 +891,4 @@ export default function LiveSessionGraph(props: Props) {
     </ReactFlowProvider>
   );
 }
+

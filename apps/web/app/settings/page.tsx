@@ -571,8 +571,10 @@ export default function SettingsPage() {
 
   return (
     <main className="simple-page">
-      <header>
-        <h1>Settings</h1>
+      <header className="page-head">
+        <div>
+          <h1>Settings</h1>
+        </div>
         <nav>
           <Link href="/">Back to chat</Link>
           <Link href="/evolution">Generations</Link>

@@ -7,8 +7,10 @@ import EvolutionPanel from '@/components/EvolutionPanel';
 export default function EvolutionPage() {
   return (
     <main className="simple-page">
-      <header>
-        <h1>Project generations</h1>
+      <header className="page-head">
+        <div>
+          <h1>Project generations</h1>
+        </div>
         <nav>
           <Link href="/">Back to chat</Link>
           <Link href="/settings">Settings</Link>

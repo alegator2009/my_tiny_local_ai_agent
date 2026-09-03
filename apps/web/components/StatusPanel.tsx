@@ -55,26 +55,23 @@ function fmtCompact(n: number): string {
   return `${(n / 1_000_000).toFixed(2)}M`;
 }
 
-// Same colour curve as the graph edges so the user instantly connects
-// the bar colour with the line colour in the cognitive graph.
+// Context-bar fill colour: maps a 0..100 usage percent to a neutral ramp
+// that mirrors the warm-amber accent. Low usage is muted grey, mid usage
+// is the accent, and high usage is the danger red. No neon green/yellow.
 function contextFillColor(percent: number, alpha = 0.95): string {
   const p = Math.max(0, Math.min(1, percent / 100));
+  // Stops: 0.00 -> muted grey, 0.70 -> accent amber, 1.00 -> danger red.
   let r: number, g: number, b: number;
-  if (p < 0.55) {
-    const t = p / 0.55;
-    r = Math.round(0 + (255 - 0) * t);
-    g = Math.round(255 + (200 - 255) * t);
-    b = Math.round(102 + (60 - 102) * t);
-  } else if (p < 0.8) {
-    const t = (p - 0.55) / 0.25;
-    r = 255;
-    g = Math.round(200 + (110 - 200) * t);
-    b = Math.round(60 + (50 - 60) * t);
+  if (p < 0.7) {
+    const t = p / 0.7;
+    r = Math.round(107 + (180 - 107) * t);
+    g = Math.round(107 + (83 - 107) * t);
+    b = Math.round(107 + (9 - 107) * t);
   } else {
-    const t = (p - 0.8) / 0.2;
-    r = Math.round(255 + (170 - 255) * t);
-    g = Math.round(110 + (0 - 110) * t);
-    b = Math.round(50 + (0 - 50) * t);
+    const t = (p - 0.7) / 0.3;
+    r = Math.round(180 + (185 - 180) * t);
+    g = Math.round(83 + (28 - 83) * t);
+    b = Math.round(9 + (28 - 9) * t);
   }
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
@@ -137,24 +134,39 @@ const TYPE_TAG: Record<string, string> = {
   rollover_summary: 'RO',
 };
 
+// Type → neutral color for the context progress bar and any other inline
+// styling that needs a per-message-type hue. The palette is intentionally
+// muted: the warm amber accent, the neutral text/muted greys, and a single
+// danger red. No neon, no phosphor, no purple/blue/pink — those made the
+// product feel like an AI demo instead of a tool.
+const ACCENT = 'rgba(180, 83, 9, 0.95)';        // --accent
+const ACCENT_SOFT = 'rgba(180, 83, 9, 0.55)';
+const TEXT = 'rgba(26, 26, 26, 0.95)';          // --text
+const MUTED = 'rgba(107, 107, 107, 0.95)';      // --muted
+const MUTED_SOFT = 'rgba(107, 107, 107, 0.55)';
+const WARNING = 'rgba(124, 90, 16, 0.95)';      // --warning-text
+const WARNING_SOFT = 'rgba(124, 90, 16, 0.55)';
+const DANGER = 'rgba(185, 28, 28, 0.95)';       // --danger
+const DANGER_SOFT = 'rgba(185, 28, 28, 0.55)';
+
 const TYPE_COLOR: Record<string, string> = {
-  user: 'rgba(0, 255, 156, 0.95)',
-  assistant: 'rgba(0, 255, 156, 0.95)',
-  tool_call: 'rgba(0, 212, 255, 0.95)',
-  tool_result: 'rgba(0, 212, 255, 0.6)',
-  mcp_tool_call: 'rgba(177, 78, 255, 0.95)',
-  mcp_tool_result: 'rgba(177, 78, 255, 0.6)',
-  terminal_command: 'rgba(255, 186, 92, 0.95)',
-  terminal_output: 'rgba(255, 186, 92, 0.55)',
-  file_change: 'rgba(255, 222, 92, 0.95)',
-  file_snapshot: 'rgba(255, 222, 92, 0.6)',
-  diff_summary: 'rgba(255, 222, 92, 0.85)',
-  test_result: 'rgba(135, 217, 154, 0.95)',
-  build_error: 'rgba(255, 95, 95, 0.95)',
-  image_created: 'rgba(255, 137, 222, 0.95)',
-  artifact_created: 'rgba(255, 137, 222, 0.85)',
-  checkpoint: 'rgba(0, 212, 255, 0.95)',
-  window: 'rgba(0, 255, 156, 0.95)',
+  user: TEXT,
+  assistant: ACCENT,
+  tool_call: MUTED,
+  tool_result: MUTED_SOFT,
+  mcp_tool_call: WARNING,
+  mcp_tool_result: WARNING_SOFT,
+  terminal_command: WARNING,
+  terminal_output: WARNING_SOFT,
+  file_change: TEXT,
+  file_snapshot: MUTED_SOFT,
+  diff_summary: MUTED,
+  test_result: ACCENT,
+  build_error: DANGER,
+  image_created: TEXT,
+  artifact_created: MUTED,
+  checkpoint: ACCENT_SOFT,
+  window: ACCENT,
 };
 
 function truncate(str: string, n: number): string {
@@ -235,7 +247,7 @@ export default function StatusPanel(props: Props) {
     // Walk back-to-front so the *latest* event is the leftmost chip.
     return tail.slice().reverse().map((m) => {
       const tag = TYPE_TAG[m.message_type] ?? m.message_type.slice(0, 3).toUpperCase();
-      const colour = TYPE_COLOR[m.message_type] ?? 'rgba(0, 255, 156, 0.85)';
+      const colour = TYPE_COLOR[m.message_type] ?? 'rgba(180, 83, 9, 0.85)';
       const hint = toolHint(m);
       return { id: m.id, tag, colour, hint, role: m.role };
     });
