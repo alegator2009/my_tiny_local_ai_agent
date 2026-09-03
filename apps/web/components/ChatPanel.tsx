@@ -1001,11 +1001,22 @@ export default function ChatPanel({
         })}
       </div>
       <form onSubmit={onSubmit} className="chat-input">
-        <input
+        <textarea
           className="chat-input-field"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Type your message"
+          onKeyDown={(e) => {
+            // Enter inserts a newline. Cmd/Ctrl+Enter (or the Send
+            // button) submits, matching the convention of multi-line
+            // chat boxes — pressing Enter alone no longer fires the
+            // form, so the user can keep typing freely.
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+          placeholder="Type your message (Enter for new line, Ctrl/⌘+Enter to send)"
+          rows={4}
         />
         {enabledProviders.length > 0 ? (
           <div className="chat-model-picker" ref={modelPickerRef}>
@@ -1016,13 +1027,21 @@ export default function ChatPanel({
               onClick={() => setModelPickerOpen((v) => !v)}
               title="Choose provider, model and thinking depth"
             >
-              <span className="chat-model-trigger-label">Model</span>
-              <span className="chat-model-trigger-summary">
-                <span>{currentProviderName}</span>
-                <span className="chat-model-trigger-sep">·</span>
-                <span>{currentModelName}</span>
-                <span className="chat-model-trigger-sep">·</span>
-                <span>thinking: {thinkingMode}</span>
+              <span className="chat-model-trigger-row">
+                <span className="chat-model-trigger-label">Provider</span>
+                <span className="chat-model-trigger-value" title={currentProviderName}>
+                  {currentProviderName}
+                </span>
+              </span>
+              <span className="chat-model-trigger-row">
+                <span className="chat-model-trigger-label">Model</span>
+                <span className="chat-model-trigger-value" title={currentModelName}>
+                  {currentModelName}
+                </span>
+              </span>
+              <span className="chat-model-trigger-row">
+                <span className="chat-model-trigger-label">Thinking</span>
+                <span className="chat-model-trigger-value">{thinkingMode}</span>
               </span>
               <span className="chat-model-trigger-caret" aria-hidden>▾</span>
             </button>

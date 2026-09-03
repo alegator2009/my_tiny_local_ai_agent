@@ -178,11 +178,10 @@ export default function EvolutionPanel() {
   }
 
   return (
-    <section className={`panel evolution-panel ${expanded ? 'expanded' : 'collapsed'}`}>
-      <div className="panel-head evolution-head">
+    <div className={`evolution-panel ${expanded ? 'expanded' : 'collapsed'}`}>
+      <header className="evolution-page-head">
         <div>
-          <h2>Project generations</h2>
-          <small>
+          <small className="small-muted">
             {activeGeneration
               ? `${activeGeneration.name} active · ${activeGeneration.status}`
               : latest
@@ -193,10 +192,10 @@ export default function EvolutionPanel() {
         <div className="evolution-head-actions">
           {latest ? <span className={`evolution-badge ${latest.status}`}>{latest.status}</span> : null}
           <button type="button" onClick={() => setExpanded((value) => !value)}>
-            {expanded ? 'Hide' : 'Show'}
+            {expanded ? 'Hide form' : 'Show form'}
           </button>
         </div>
-      </div>
+      </header>
 
       {!expanded ? null : (
         <>
@@ -319,6 +318,6 @@ export default function EvolutionPanel() {
       ) : null}
         </>
       )}
-    </section>
+    </div>
   );
 }

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import ChatPanel from '@/components/ChatPanel';
-import EvolutionPanel from '@/components/EvolutionPanel';
 import LiveSessionGraph from '@/components/LiveSessionGraph';
 import SessionList from '@/components/SessionList';
 import StatusPanel from '@/components/StatusPanel';
@@ -239,12 +238,11 @@ export default function HomePage() {
             <h1>{selectedSession?.title || 'Select a session'}</h1>
           </div>
           <nav>
+            <Link href="/evolution">Generations</Link>
             <Link href="/settings">Settings</Link>
             {selectedSessionId ? <Link href={`/memory/${selectedSessionId}`}>Memory</Link> : null}
           </nav>
         </header>
-
-        <EvolutionPanel />
 
         <ChatPanel
           sessionId={selectedSessionId}

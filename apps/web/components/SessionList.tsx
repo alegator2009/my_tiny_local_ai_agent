@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Session } from '@/lib/api';
 
@@ -23,6 +23,9 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
   const [titleDraft, setTitleDraft] = useState('');
   const [modeDraft, setModeDraft] = useState<'full' | 'skill_state'>('full');
   const [submitting, setSubmitting] = useState(false);
+  // The id of the session whose action menu is open (or null if none).
+  // Only one row can be open at a time so the layout stays predictable.
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null);
   // ``mounted`` flips to true on the first client render.  We use it
   // to delay rendering locale-sensitive strings (``toLocaleString``)
   // until the client knows the user's timezone, otherwise the SSR
@@ -32,6 +35,32 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close the row's "..." menu on outside click / Escape so the menu
+  // never gets stuck open when the user moves on to another row.
+  useEffect(() => {
+    if (!actionsOpenId) return;
+    function onDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        !actionsTriggerRefs.current[actionsOpenId as string]?.contains(target) &&
+        !actionsMenuRefs.current[actionsOpenId as string]?.contains(target)
+      ) {
+        setActionsOpenId(null);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setActionsOpenId(null);
+    }
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [actionsOpenId]);
+  const actionsTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const actionsMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const reset = () => {
     setTitleDraft('');
@@ -54,25 +83,66 @@ export default function SessionList({ sessions, selectedSessionId, onSelect, onC
       <ul className="session-list">
         {sessions.map((s) => (
           <li key={s.id} className={selectedSessionId === s.id ? 'active' : ''}>
-            <button className="session-row" onClick={() => onSelect(s.id)}>
-              <span>{s.title}</span>
-              <small suppressHydrationWarning>
-                {mounted ? new Date(s.updated_at).toLocaleString() : ''}
-              </small>
-            </button>
-            <div className="session-actions">
-              <button onClick={() => onArchive(s.id)}>Archive</button>
+            <div className="session-row-wrap">
               <button
-                onClick={async () => {
-                  const ok = window.confirm(`Delete session "${s.title}" permanently?`);
-                  if (!ok) {
-                    return;
-                  }
-                  await onDelete(s.id);
+                className="session-row"
+                onClick={() => onSelect(s.id)}
+                title={s.title}
+              >
+                <span className="session-title">{s.title}</span>
+                <small suppressHydrationWarning className="session-time">
+                  {mounted ? new Date(s.updated_at).toLocaleString() : ''}
+                </small>
+              </button>
+              <button
+                ref={(el) => {
+                  actionsTriggerRefs.current[s.id] = el;
+                }}
+                className="session-row-menu-btn"
+                aria-label={`Actions for ${s.title}`}
+                aria-haspopup="menu"
+                aria-expanded={actionsOpenId === s.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionsOpenId((current) => (current === s.id ? null : s.id));
                 }}
               >
-                Delete
+                ⋯
               </button>
+              {actionsOpenId === s.id ? (
+                <div
+                  ref={(el) => {
+                    actionsMenuRefs.current[s.id] = el;
+                  }}
+                  className="session-row-menu"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    role="menuitem"
+                    onClick={async () => {
+                      setActionsOpenId(null);
+                      await onArchive(s.id);
+                    }}
+                  >
+                    Archive
+                  </button>
+                  <button
+                    role="menuitem"
+                    className="danger"
+                    onClick={async () => {
+                      setActionsOpenId(null);
+                      const ok = window.confirm(`Delete session "${s.title}" permanently?`);
+                      if (!ok) {
+                        return;
+                      }
+                      await onDelete(s.id);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : null}
             </div>
           </li>
         ))}

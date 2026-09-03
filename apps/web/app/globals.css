@@ -128,7 +128,13 @@ a {
 
 .main-column {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  /* ``minmax(0, 1fr)`` is the standard grid trick to make the chat
+     row genuinely stretch to the bottom of the viewport. A bare
+     ``1fr`` resolves to ``minmax(auto, 1fr)`` which refuses to
+     shrink below the row's ``min-content`` size — so a single tall
+     message or the empty-state block would push the input above
+     off-screen instead of letting the chat fill the column. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
   overflow: hidden;
@@ -200,7 +206,7 @@ a {
   display: grid;
   align-content: start;
   grid-auto-rows: max-content;
-  gap: 8px;
+  gap: 4px;
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
@@ -214,8 +220,7 @@ a {
 
 .session-list li {
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px;
+  border-radius: 8px;
   background: var(--surface);
 }
 
@@ -224,21 +229,121 @@ a {
   background: var(--accent-soft);
 }
 
+/* Row layout: title + timestamp stacked vertically on the left, with
+   a single "..." trigger floating in the top-right corner. Keeping the
+   row single-column saves vertical space so more sessions fit on screen. */
+.session-row-wrap {
+  position: relative;
+  display: block;
+}
+
 .session-row {
   width: 100%;
   border: 0;
   background: transparent;
   text-align: left;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
   cursor: pointer;
+  color: var(--text);
+  padding: 6px 32px 6px 8px;
+  min-width: 0;
+}
+
+.session-row .session-title {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.session-row .session-time {
+  grid-column: 1;
+  grid-row: 2;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* "..." trigger lives absolutely in the top-right so the row can stay
+   a single compact block. */
+.session-row-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.session-row-menu-btn:hover,
+.session-row-menu-btn[aria-expanded='true'] {
+  background: var(--surface-strong);
+  border-color: var(--line);
   color: var(--text);
 }
 
-.session-actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 6px;
+/* Floating popup anchored to the "..." trigger. Single column, tight
+   padding so it stays unobtrusive but still tappable. */
+.session-row-menu {
+  position: absolute;
+  top: 30px;
+  right: 4px;
+  z-index: 30;
+  min-width: 140px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px var(--shadow);
+  padding: 4px;
+  display: grid;
+  gap: 2px;
+}
+
+.session-row-menu button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.session-row-menu button:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.session-row-menu button.danger {
+  color: var(--danger);
+}
+
+.session-row-menu button.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 button {
@@ -277,14 +382,15 @@ textarea {
   box-shadow: 0 4px 14px var(--shadow);
 }
 
-.session-actions button:last-child {
-  color: var(--danger);
-}
+
 
 .chat-panel {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  /* ``overflow: hidden`` keeps the rounded panel from leaking its
+     sticky/fixed children out of the panel's clipping box. */
+  overflow: hidden;
 }
 
 .chat-prefix-control {
@@ -310,6 +416,9 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  /* Never let the controls row shrink — it must always stay visible
+     at the top of the chat panel. */
+  flex: 0 0 auto;
 }
 
 .chat-controls-inline {
@@ -360,6 +469,11 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 6px;
   margin: 8px 0;
+  /* The strip is optional — when no runs are active it renders as a
+     zero-height block, but if any chips are showing we want them to
+     stay visible right under the controls row, never pushing the
+     input bar off-screen. */
+  flex: 0 0 auto;
 }
 
 .run-chip {
@@ -416,26 +530,28 @@ textarea {
 
 .evolution-panel {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   overflow: visible;
+  margin-top: 12px;
 }
 
 .evolution-panel.collapsed {
   gap: 0;
 }
 
-.evolution-panel h2 {
-  margin: 0;
-  font-size: 16px;
+/* Page-level header shown above the panel on the dedicated
+   /evolution page. Matches the look of the toolbar used on
+   the main chat page. */
+.evolution-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 
-.evolution-head > div:first-child {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.evolution-head small {
+.evolution-page-head small {
   overflow: hidden;
   color: var(--muted);
   font-size: 12px;
@@ -443,7 +559,7 @@ textarea {
   white-space: nowrap;
 }
 
-.evolution-head-actions {
+.evolution-page-head .evolution-head-actions {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -697,6 +813,11 @@ textarea {
   justify-items: start;
   gap: 10px;
   padding-right: 4px;
+  /* Take every remaining vertical pixel between the controls row
+     above and the pinned input row below.  ``min-height: 0`` is what
+     lets the inner scrollbar take over instead of pushing the
+     message list outside the panel. */
+  flex: 1 1 auto;
 }
 
 /* Empty-state placeholder shown inside the timeline when there are no
@@ -858,27 +979,64 @@ textarea {
 .chat-input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 8px;
+  gap: 0;
   align-items: stretch;
-  margin-top: 12px;
+  /* The input row must never shrink, never scroll out of view and
+     always sit at the bottom of the panel — even on a tiny viewport
+     with a long transcript.  ``flex: 0 0 auto`` pins its height to
+     the natural 4-line textarea height. */
+  flex: 0 0 auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 -4px 12px var(--shadow);
 }
 
+/* Static height of ~4 lines of text. The textarea's `rows` attribute
+   controls its native height, but we pin it via CSS so the layout
+   stays stable regardless of font / theme. resize:none prevents the
+   user from accidentally growing it past the panel.  We drop the
+   border here because the wrapping ``.chat-input`` provides it. */
 .chat-input-field {
   min-width: 0;
   width: 100%;
-  min-height: 38px;
+  height: calc(1.5em * 4 + 18px); /* line-height 1.5 * 4 lines + vertical padding */
+  min-height: calc(1.5em * 4 + 18px);
+  max-height: calc(1.5em * 4 + 18px);
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 8px;
   background: var(--surface-strong);
   color: var(--text);
   font: inherit;
+  line-height: 1.5;
+  resize: none;
+  overflow-y: auto;
 }
 
 .chat-send {
+  /* The wrapping ``.chat-input`` already provides the border and the
+     rounded corners, so this button drops its own border and aligns
+     to the right edge of the unified input block. */
   min-height: 38px;
+  align-self: stretch;
   padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.chat-send:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.chat-send:disabled {
+  background: var(--surface-muted);
+  color: var(--muted);
 }
 
 .chat-model-picker {
@@ -886,60 +1044,72 @@ textarea {
   align-self: stretch;
   display: flex;
   align-items: stretch;
+  /* Inset so the trigger doesn't paint its own border — the parent
+     ``.chat-input`` block already has one. */
+  padding: 0 4px;
 }
 
 .chat-model-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 26px 0 12px;
+  display: grid;
+  /* Three rows, each row is itself a 2-column label : value grid.
+     The single outer grid lays out the rows; per-row alignment is
+     handled by the inline ``chat-model-trigger-row`` element which
+     is also a 2-column grid.  The caret sits absolutely so it
+     doesn't take a column slot. */
+  grid-template-rows: auto auto auto;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  row-gap: 2px;
+  padding: 6px 26px 6px 10px;
   height: 100%;
   min-width: 0;
-  max-width: 320px;
-  border: 1px solid var(--line);
+  /* Wider than before — we now show full ``Label: value`` rows so
+     the button needs more room.  Still small enough to leave the
+     textarea plenty of width. */
+  max-width: 220px;
+  border: 0;
   border-radius: 8px;
-  background: var(--surface-strong);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
   text-align: left;
   font: inherit;
-  white-space: nowrap;
   position: relative;
 }
 
 .chat-model-trigger:hover {
-  border-color: var(--accent);
+  background: var(--surface-muted);
+}
+
+/* Each row is its own mini-grid: tiny uppercase label on the left,
+   the value on the right, both vertically centered. */
+.chat-model-trigger-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 8px;
+  min-width: 0;
+  line-height: 1.15;
 }
 
 .chat-model-trigger-label {
-  font-size: 11px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--muted);
+  white-space: nowrap;
   flex: 0 0 auto;
 }
 
-.chat-model-trigger-summary {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.chat-model-trigger-summary > span {
+.chat-model-trigger-value {
+  font-size: 12px;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.chat-model-trigger-sep {
-  color: var(--muted);
-  flex: 0 0 auto;
+  min-width: 0;
+  text-align: right;
+  text-transform: capitalize;
 }
 
 .chat-model-trigger-caret {
@@ -997,7 +1167,7 @@ textarea {
   color: var(--muted);
 }
 
-.chat-input input,
+.chat-input textarea,
 .chat-input select,
 .chat-prefix-row input,
 .chat-template-row select,

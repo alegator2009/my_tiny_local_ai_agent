@@ -573,7 +573,10 @@ export default function SettingsPage() {
     <main className="simple-page">
       <header>
         <h1>Settings</h1>
-        <Link href="/">Back</Link>
+        <nav>
+          <Link href="/">Back to chat</Link>
+          <Link href="/evolution">Generations</Link>
+        </nav>
       </header>
 
       {providerError ? (
