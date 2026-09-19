@@ -52,6 +52,11 @@ short-term summarisation and long-term memory work together.
   Startpage) and, if every external engine is down, to an in-process
   curated snapshot of common agentic-AI / no-code platforms.  The agent
   always has grounded citations to quote.
+- **Optional TypeSafe Jev routing.**  When enabled with a TypeSafe API token,
+  the Jev System One model makes narrow, typed `Choice` decisions: whether an
+  auto web search is needed and which SKILL.state skill fits a request.  It
+  never replaces the chat model.  Missing credentials, network failures and
+  low-confidence results fall back to the existing deterministic heuristics.
 - **Stalled-session detector.**  When the assistant replies with three
   identical clarification requests in a row, the session is demoted to
   `status: "stalled"`; the very next user message flips it back to
@@ -93,6 +98,7 @@ short-term summarisation and long-term memory work together.
 │      │   └─► record_turn_entities → durable_facts.json            │
 │      ├─► mcp.MCPToolRegistry       (stdio MCP, schema cache)      │
 │      ├─► auto_search.run_auto_search                              │
+│      │   └─► TypeSafe Jev Choice (optional, confidence-gated)      │
 │      │   ├─► Tier 1: native-web-search MCP                        │
 │      │   ├─► Tier 2: direct_search (Bing / Wiki / arXiv / SP)    │
 │      │   └─► Tier 3: known_platforms snapshot                     │
@@ -116,6 +122,7 @@ Key entry points:
 | `apps/api/app/services/skill_state.py` | SKILL.state runtime (`(spec, state, observation)` bundle) |
 | `apps/api/app/services/mcp.py` | MCP registry, schema sanitiser, telemetry |
 | `apps/api/app/services/auto_search.py` | Auto-search router: heuristic + cache + grounded block + Tier-2 fallback |
+| `apps/api/app/services/typesafe.py` | Native TypeSafe Jev client for optional, typed routing choices |
 | `apps/api/app/services/direct_search.py` | In-process Bing / Wikipedia / arXiv / Startpage + curated snapshot |
 | `apps/api/app/services/prompt.py` + `prompt_cache.py` | Prompt assembly with `known_entities` injection |
 | `apps/api/app/services/vector_store.py` | LanceDB wrapper with safe fallback |
@@ -239,6 +246,29 @@ Auto-search events stream to the UI as a
 chat header and as a `🔎 Auto-search (…)` system card listing each
 citation with its URL.  Audit rows live in the `auto_search_runs`
 SQLite table.
+
+### TypeSafe Jev — optional semantic routing
+
+[TypeSafe Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+is an optional System One decision model. The application sends it one narrow,
+typed `Choice` at a time; normal application code retains control of the
+workflow. Jev currently refines two decisions:
+
+1. In `auto` web-search policy, whether the incoming request needs current or
+   externally verifiable information.
+2. In `skill_state` context mode, which registered skill best matches the
+   request, including an explicit “no matching skill” option.
+
+Configure it in **Settings → Global defaults → TypeSafe Jev**:
+
+1. Enable **Use Jev for routing choices**.
+2. Paste a TypeSafe API token and save.
+3. Optionally tune the confidence threshold (default `0.70`) and timeout.
+
+The saved token is redacted from the settings response and stays server-side.
+Leaving Jev disabled, omitting the token, receiving a failed API request, or
+receiving a result below the configured confidence threshold preserves the
+same heuristic routing behaviour used before this integration.
 
 ### SKILL.state — bounded context for long-running tasks
 

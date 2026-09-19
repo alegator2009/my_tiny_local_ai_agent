@@ -179,8 +179,16 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       const autoSearchConfig = config.mcp_config?.auto_search || {};
+      const typesafeConfig = config.typesafe_config || {};
       const normalized = {
         ...config,
+        typesafe_config: {
+          enabled: Boolean(typesafeConfig.enabled),
+          api_key: String(typesafeConfig.api_key || ''),
+          model: String(typesafeConfig.model || 'jev-latest'),
+          timeout_sec: parseBoundedInt(typesafeConfig.timeout_sec ?? 3, 3, 1, 30),
+          min_confidence: Math.max(0, Math.min(1, Number(typesafeConfig.min_confidence) || 0))
+        },
         mcp_config: {
           ...(config.mcp_config || {}),
           enabled: Boolean(config.mcp_config?.enabled),
@@ -1128,6 +1136,91 @@ export default function SettingsPage() {
         <p className="small-muted">
           Effective context window: min(override, active model window). Empty override = active model window.
         </p>
+
+        <hr />
+
+        <h3>TypeSafe Jev — semantic choices</h3>
+        <p className="small-muted">
+          Jev can make fast, typed routing choices for auto web search and SKILL.state selection. It never replaces your
+          chat model. Leave it disabled or leave the token blank to keep the current heuristic behaviour exactly as-is.
+        </p>
+        <label className="inline-checkbox">
+          <input
+            type="checkbox"
+            checked={Boolean(config.typesafe_config?.enabled)}
+            onChange={(e) =>
+              setConfig((prev: any) => ({
+                ...prev,
+                typesafe_config: {
+                  ...(prev.typesafe_config || {}),
+                  enabled: e.target.checked,
+                  model: prev.typesafe_config?.model || 'jev-latest',
+                  timeout_sec: prev.typesafe_config?.timeout_sec ?? 3,
+                  min_confidence: prev.typesafe_config?.min_confidence ?? 0.7
+                }
+              }))
+            }
+          />
+          Use Jev for routing choices
+        </label>
+        <div className="provider-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <label style={{ gridColumn: '1 / -1' }}>
+            TypeSafe API token
+            <input
+            type="password"
+            autoComplete="off"
+              placeholder="Paste a token to add or replace it"
+              value={config.typesafe_config?.api_key || ''}
+              onChange={(e) =>
+                setConfig((prev: any) => ({
+                  ...prev,
+                  typesafe_config: { ...(prev.typesafe_config || {}), api_key: e.target.value }
+                }))
+              }
+            />
+          </label>
+          <p className="small-muted" style={{ gridColumn: '1 / -1' }}>
+            The saved token is redacted after refresh; an empty field keeps it unchanged.
+          </p>
+          <label>
+            Confidence threshold
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value={config.typesafe_config?.min_confidence ?? 0.7}
+              onChange={(e) =>
+                setConfig((prev: any) => ({
+                  ...prev,
+                  typesafe_config: {
+                    ...(prev.typesafe_config || {}),
+                    min_confidence: Math.max(0, Math.min(1, Number(e.target.value) || 0))
+                  }
+                }))
+              }
+            />
+          </label>
+          <label>
+            Jev timeout (sec)
+            <input
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              value={config.typesafe_config?.timeout_sec ?? 3}
+              onChange={(e) =>
+                setConfig((prev: any) => ({
+                  ...prev,
+                  typesafe_config: {
+                    ...(prev.typesafe_config || {}),
+                    timeout_sec: parseBoundedInt(e.target.value, 3, 1, 30)
+                  }
+                }))
+              }
+            />
+          </label>
+        </div>
 
         <label>
           Initial system prompt

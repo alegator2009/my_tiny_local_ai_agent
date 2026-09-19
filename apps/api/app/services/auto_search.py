@@ -56,6 +56,7 @@ from typing import Any, Iterable
 from ..config import AppConfig, AutoSearchConfig
 from ..db import execute, fetch_one, init_db, utcnow_iso
 from .mcp import MCPError, MCPToolRegistry
+from .typesafe import evaluate_choice
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +335,65 @@ def should_search(
         policy=policy,
         query=query,
         normalized_query=normalized,
+    )
+
+
+async def decide_search(
+    user_message: str,
+    *,
+    cfg: AppConfig,
+    force: bool = False,
+    freshness_hints: list[str] | None = None,
+    factual_hints: list[str] | None = None,
+    opinion_hints: list[str] | None = None,
+) -> SearchDecision:
+    """Use Jev to refine the ``auto`` policy, with the old router as fallback.
+
+    Explicit user intent and non-auto policies remain deterministic.  Jev is
+    only asked the narrow question the heuristic previously answered itself.
+    """
+
+    auto_cfg = cfg.mcp_config.auto_search
+    fallback = should_search(
+        user_message,
+        policy=auto_cfg.policy,
+        enabled=auto_cfg.enabled,
+        force=force,
+        freshness_hints=freshness_hints,
+        factual_hints=factual_hints,
+        opinion_hints=opinion_hints,
+    )
+    if (
+        fallback.policy != "auto"
+        or force
+        or not auto_cfg.enabled
+        or not fallback.normalized_query
+        or not cfg.typesafe_config.is_ready()
+    ):
+        return fallback
+
+    answer = await evaluate_choice(
+        state={"user_message": user_message},
+        instructions=(
+            "Before the chat model responds, decide whether this user message needs a web search. "
+            "Choose search only for information that is current, externally verifiable, local, "
+            "or otherwise needs sources. Choose skip for casual conversation, writing, reasoning, "
+            "coding from supplied context, and questions answerable without current web facts."
+        ),
+        criteria={
+            "search": "A web lookup is needed before answering.",
+            "skip": "A web lookup is not needed before answering.",
+        },
+        config=cfg.typesafe_config,
+    )
+    if answer is None or answer.confidence < cfg.typesafe_config.min_confidence:
+        return fallback
+    return SearchDecision(
+        should_search=answer.choice == "search",
+        reason=f"typesafe_jev_{answer.choice}",
+        policy=fallback.policy,
+        query=fallback.query,
+        normalized_query=fallback.normalized_query,
     )
 
 
@@ -875,10 +935,9 @@ async def run_auto_search(
     """
 
     auto_cfg: AutoSearchConfig = cfg.mcp_config.auto_search
-    decision = should_search(
+    decision = await decide_search(
         user_message,
-        policy=auto_cfg.policy,
-        enabled=auto_cfg.enabled,
+        cfg=cfg,
         force=force,
         freshness_hints=auto_cfg.freshness_hints or None,
         factual_hints=auto_cfg.factual_hints or None,
@@ -1106,6 +1165,7 @@ __all__ = [
     "AutoSearchResult",
     "SearchDecision",
     "build_grounded_block",
+    "decide_search",
     "record_run",
     "run_auto_search",
     "should_search",

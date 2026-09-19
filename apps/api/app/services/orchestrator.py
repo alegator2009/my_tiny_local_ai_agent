@@ -30,7 +30,6 @@ from .auto_search import (
     build_grounded_block as _build_grounded_block_helper,
     record_run as _record_auto_search_run,
     run_auto_search as _run_auto_search,
-    should_search as _should_auto_search,
 )
 from .provider_http import (
     build_payload,
@@ -1438,6 +1437,48 @@ def _auto_select_skill(user_content: str, *, threshold: int = 2) -> str | None:
     return None
 
 
+async def _auto_select_skill_with_jev(user_content: str, cfg: Any) -> str | None:
+    """Let Jev make the bounded SKILL.state routing choice when configured.
+
+    The established token-overlap selector remains the fallback, so a missing
+    TypeSafe token changes neither routing nor prompt construction.
+    """
+
+    fallback = _auto_select_skill(user_content)
+    if not cfg.typesafe_config.is_ready():
+        return fallback
+    try:
+        from .skill_state import list_skills_in_registry, _load_skill  # noqa: WPS433
+        from .typesafe import evaluate_choice  # noqa: WPS433
+
+        criteria: dict[str, str | None] = {
+            "__no_matching_skill__": "No registered skill is clearly applicable to this request."
+        }
+        for name in list_skills_in_registry() or []:
+            skill = _load_skill(name)
+            if not isinstance(skill, dict):
+                continue
+            description = str(skill.get("description") or "").strip()
+            when_to_use = str(skill.get("whenToUse") or "").strip()
+            criteria[name] = " ".join(part for part in (description, when_to_use) if part) or None
+        if len(criteria) == 1:
+            return fallback
+        answer = await evaluate_choice(
+            state={"user_message": user_content},
+            instructions=(
+                "Select the one registered skill that should manage this user request. "
+                "Choose no matching skill unless a skill's stated purpose clearly applies."
+            ),
+            criteria=criteria,
+            config=cfg.typesafe_config,
+        )
+        if answer is None or answer.confidence < cfg.typesafe_config.min_confidence:
+            return fallback
+        return None if answer.choice == "__no_matching_skill__" else answer.choice
+    except Exception:
+        return fallback
+
+
 # Maximum number of consecutive identical assistant turns before we
 # flag the session as ``stalled``. Set to 3 — that is the same
 # threshold used by the upstream UI to surface "stuck" indicators.
@@ -1728,10 +1769,11 @@ async def stream_chat(
     # section and can quote them instead of guessing.
     # ------------------------------------------------------------------
     auto_cfg = cfg.mcp_config.auto_search
-    auto_decision = _should_auto_search(
+    from .auto_search import decide_search as _decide_auto_search
+
+    auto_decision = await _decide_auto_search(
         user_content,
-        policy=auto_cfg.policy,
-        enabled=auto_cfg.enabled,
+        cfg=cfg,
         force=force_search,
         freshness_hints=auto_cfg.freshness_hints or None,
         factual_hints=auto_cfg.factual_hints or None,
@@ -1897,11 +1939,9 @@ async def stream_chat(
     #      In ``'full'`` mode the chat history stays in the prompt
     #      and the orchestrator never silently swaps it out.
     auto_select = effective_context_mode == "skill_state"
-    detected_skill = (
-        active_skill
-        or _detect_active_skill(user_content)
-        or (_auto_select_skill(user_content) if auto_select else None)
-    )
+    detected_skill = active_skill or _detect_active_skill(user_content)
+    if detected_skill is None and auto_select:
+        detected_skill = await _auto_select_skill_with_jev(user_content, cfg)
     skill_bundle: dict[str, Any] | None = None
     if detected_skill:
         try:

@@ -12,13 +12,15 @@ import time
 
 import pytest
 
-from app.config import AutoSearchConfig
+from app.config import AppConfig, AutoSearchConfig, MCPConfig, TypeSafeConfig
 from app.db import execute, init_db
 from app.services.auto_search import (
     AutoSearchCache,
     build_grounded_block,
+    decide_search,
     should_search,
 )
+from app.services.typesafe import ChoiceAnswer
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +116,53 @@ def test_should_search_empty_query_is_skipped():
     )
     assert decision.should_search is False
     assert decision.reason == "empty_query"
+
+
+def _typesafe_auto_config() -> AppConfig:
+    return AppConfig(
+        mcp_config=MCPConfig(auto_search=AutoSearchConfig(enabled=True, policy="auto")),
+        typesafe_config=TypeSafeConfig(enabled=True, api_key="test-token", min_confidence=0.7),
+    )
+
+
+def test_decide_search_uses_heuristic_when_jev_is_not_configured(monkeypatch):
+    async def _must_not_call(**kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("Jev must stay inactive without a configured token")
+
+    monkeypatch.setattr("app.services.auto_search.evaluate_choice", _must_not_call)
+    cfg = AppConfig(mcp_config=MCPConfig(auto_search=AutoSearchConfig(enabled=True, policy="auto")))
+
+    import asyncio
+
+    decision = asyncio.run(decide_search("Who is the CEO of Anthropic?", cfg=cfg))
+    assert decision.should_search is True
+    assert decision.reason == "factual_hint"
+
+
+def test_decide_search_uses_confident_jev_choice(monkeypatch):
+    async def _choose_skip(**kwargs):  # type: ignore[no-untyped-def]
+        return ChoiceAnswer(choice="skip", confidence=0.92, probabilities={"search": 0.08, "skip": 0.92})
+
+    monkeypatch.setattr("app.services.auto_search.evaluate_choice", _choose_skip)
+
+    import asyncio
+
+    decision = asyncio.run(decide_search("What is the latest news today?", cfg=_typesafe_auto_config()))
+    assert decision.should_search is False
+    assert decision.reason == "typesafe_jev_skip"
+
+
+def test_decide_search_falls_back_when_jev_is_uncertain(monkeypatch):
+    async def _uncertain_skip(**kwargs):  # type: ignore[no-untyped-def]
+        return ChoiceAnswer(choice="skip", confidence=0.45, probabilities={"search": 0.45, "skip": 0.55})
+
+    monkeypatch.setattr("app.services.auto_search.evaluate_choice", _uncertain_skip)
+
+    import asyncio
+
+    decision = asyncio.run(decide_search("What is the latest news today?", cfg=_typesafe_auto_config()))
+    assert decision.should_search is True
+    assert decision.reason == "freshness_hint"
 
 
 # ---------------------------------------------------------------------------

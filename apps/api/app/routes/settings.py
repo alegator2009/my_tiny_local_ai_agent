@@ -11,7 +11,7 @@ from ..schemas import (
     ProviderValidationRequest,
     ProviderValidationResponse,
 )
-from ..services.auto_search import run_auto_search, should_search
+from ..services.auto_search import decide_search, run_auto_search
 from ..services.mcp import MCPToolRegistry
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -19,13 +19,24 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 @router.get("", response_model=AppConfig)
 def get_config():
-    return load_app_config()
+    # The browser only needs to know that this integration exists; it never
+    # needs to read a saved TypeSafe credential back.  This also lets the
+    # password input remain empty after a refresh.
+    config = load_app_config().model_copy(deep=True)
+    config.typesafe_config.api_key = ""
+    return config
 
 
 @router.put("", response_model=AppConfig)
 def update_config(payload: AppConfig):
+    # A blank password field means "keep the saved token", not "erase it".
+    # This is necessary because GET deliberately redacts the credential.
+    if not payload.typesafe_config.api_key.strip():
+        payload.typesafe_config.api_key = load_app_config().typesafe_config.api_key
     save_app_config(payload)
-    return payload
+    response = payload.model_copy(deep=True)
+    response.typesafe_config.api_key = ""
+    return response
 
 
 @router.post("/validate-provider", response_model=ProviderValidationResponse)
@@ -126,10 +137,9 @@ async def test_auto_search(payload: AutoSearchTestRequest):
 
     cfg = load_app_config()
     auto_cfg = cfg.mcp_config.auto_search
-    decision = should_search(
+    decision = await decide_search(
         payload.query,
-        policy=auto_cfg.policy,
-        enabled=auto_cfg.enabled,
+        cfg=cfg,
         force=payload.force,
         freshness_hints=auto_cfg.freshness_hints or None,
         factual_hints=auto_cfg.factual_hints or None,

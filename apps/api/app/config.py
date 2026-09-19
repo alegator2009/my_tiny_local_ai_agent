@@ -224,6 +224,42 @@ class AutoSearchConfig(BaseModel):
         return max(0, n)
 
 
+class TypeSafeConfig(BaseModel):
+    """Optional TypeSafe System One (Jev) routing settings.
+
+    The API key deliberately lives alongside the existing provider keys: this
+    is a single-user, locally persisted configuration.  An empty key keeps
+    every Jev call disabled, so existing heuristic behaviour remains intact.
+    """
+
+    enabled: bool = False
+    api_key: str = ""
+    model: str = "jev-latest"
+    timeout_sec: int = 3
+    min_confidence: float = 0.70
+
+    @field_validator("timeout_sec", mode="before")
+    @classmethod
+    def normalize_timeout(cls, value: Any) -> int:
+        try:
+            timeout = int(float(str(value).strip()))
+        except Exception:
+            timeout = 3
+        return max(1, min(timeout, 30))
+
+    @field_validator("min_confidence", mode="before")
+    @classmethod
+    def normalize_confidence(cls, value: Any) -> float:
+        try:
+            confidence = float(str(value).strip())
+        except Exception:
+            confidence = 0.70
+        return max(0.0, min(confidence, 1.0))
+
+    def is_ready(self) -> bool:
+        return bool(self.enabled and self.api_key.strip())
+
+
 class MCPConfig(BaseModel):
     enabled: bool = True
     servers: list[dict[str, Any]] = Field(default_factory=list)
@@ -273,6 +309,7 @@ class AppConfig(BaseModel):
     retrieval_config: RetrievalConfig = Field(default_factory=RetrievalConfig)
     rollover_config: RolloverConfig = Field(default_factory=RolloverConfig)
     mcp_config: MCPConfig = Field(default_factory=MCPConfig)
+    typesafe_config: TypeSafeConfig = Field(default_factory=TypeSafeConfig)
     model_context_window_size_override: int | None = None
     # Context-mode selector — how the orchestrator builds the prompt
     # that goes to the model. Two flavours are supported:
