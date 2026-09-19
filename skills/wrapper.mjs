@@ -19,9 +19,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REGISTRY_PATH = path.join(__dirname, 'registry.json');
+const require = createRequire(import.meta.url);
+const { listSkills, saveSkillDefinition } = require('./registry.js');
 
 function loadSkills() {
   if (!fs.existsSync(REGISTRY_PATH)) return [];
@@ -69,6 +72,25 @@ function readRequest() {
  * argument names so the model can pass them through.
  */
 function buildInputSchema(skill) {
+  if (skill.admin === 'registry') {
+    return {
+      type: 'object',
+      required: ['action'],
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list', 'create', 'update', 'import'],
+          description: 'Use create/import only after the user explicitly asks for a new skill; use update only after an explicit change request.',
+        },
+        definition: {
+          type: 'object',
+          description: 'Portable skill JSON: name, description, instructions, optional whenToUse, examples, and delegates_to.',
+          additionalProperties: true,
+        },
+      },
+      additionalProperties: false,
+    };
+  }
   const properties = {
     state: {
       type: 'object',
@@ -116,6 +138,28 @@ function buildInputSchema(skill) {
     type: 'object',
     properties,
     additionalProperties: true,
+  };
+}
+
+function executeRegistryAdmin(args) {
+  const action = args && typeof args.action === 'string' ? args.action : '';
+  if (action === 'list') {
+    const skills = listSkills().map((skill) => ({ name: skill.name, description: skill.description }));
+    return { content: [{ type: 'text', text: `SKILL_REGISTRY:${JSON.stringify({ success: true, action: 'list', skills })}` }] };
+  }
+  if (!['create', 'update', 'import'].includes(action)) {
+    return { content: [{ type: 'text', text: 'SKILL_REGISTRY:{"success":false,"message":"action must be list, create, update, or import"}' }], isError: true };
+  }
+  let definition = args ? args.definition : null;
+  if (typeof definition === 'string') {
+    try { definition = JSON.parse(definition); } catch {
+      return { content: [{ type: 'text', text: 'SKILL_REGISTRY:{"success":false,"message":"definition is not valid JSON"}' }], isError: true };
+    }
+  }
+  const result = saveSkillDefinition(definition, { overwrite: action === 'update' });
+  return {
+    content: [{ type: 'text', text: `SKILL_REGISTRY:${JSON.stringify(result)}` }],
+    isError: !result.success,
   };
 }
 
@@ -287,6 +331,9 @@ function buildPromptBundle(skill, state) {
 }
 
 async function executeSkill(skill, args) {
+  if (skill.admin === 'registry') {
+    return executeRegistryAdmin(args);
+  }
   // --- DELEGATING SKILL ---
   if (skill.delegates_to) {
     const delegate = {

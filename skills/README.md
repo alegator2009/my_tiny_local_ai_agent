@@ -39,6 +39,18 @@ skills/
    response to a user request via `meta-skill-creator.js` (parses the
    request, extracts name / whenToUse / instructions / examples, adds
    it to `registry.json`).
+4. **Skill author tool** — the registered `skill-author` MCP skill accepts
+   a structured definition and can create, update, import, or list skills.
+   It is available only when Skills MCP is enabled in Settings.
+
+## Creating and importing skills through chat
+
+Ask the agent explicitly to create, update, import, or list skills. The agent
+uses the `skill-author` tool and writes only validated definitions to
+`registry.json`. A definition needs a lowercase, hyphenated `name`, a concise
+`description`, and at least one `instruction`; `whenToUse`, `examples`, and
+`delegates_to` are optional. Creating or importing never overwrites an
+existing skill — an explicit update request is required.
 
 ## Running tests
 

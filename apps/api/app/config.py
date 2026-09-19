@@ -269,7 +269,9 @@ class MCPConfig(BaseModel):
     native_web_search_env: dict[str, str] = Field(default_factory=dict)
     # Skills MCP — exposes skills as separate tools so the underlying code does
     # not leak into the chat surface.
-    skills_mcp_enabled: bool = False
+    # Enabled by default so the agent can use the built-in skill-author and
+    # registered SKILL.state tools without a separate hidden configuration.
+    skills_mcp_enabled: bool = True
     skills_mcp_path: str = "skills/wrapper.mjs"
     # Auto web search: a router-level "google where I don't know" policy
     # that the orchestrator enforces before the model is asked to answer.

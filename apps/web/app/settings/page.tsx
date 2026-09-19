@@ -1294,6 +1294,26 @@ export default function SettingsPage() {
         <label className="inline-checkbox">
           <input
             type="checkbox"
+            checked={Boolean(config.mcp_config?.skills_mcp_enabled)}
+            onChange={(e) =>
+              setConfig((prev: any) => ({
+                ...prev,
+                mcp_config: {
+                  ...(prev.mcp_config || {}),
+                  skills_mcp_enabled: e.target.checked,
+                }
+              }))
+            }
+          />
+          Enable Skills MCP (including the skill-author)
+        </label>
+        <p className="small-muted">
+          Lets the agent create, update, import, and run registered skills when you explicitly ask.
+        </p>
+
+        <label className="inline-checkbox">
+          <input
+            type="checkbox"
             checked={Boolean(config.mcp_config?.native_web_search_enabled)}
             onChange={(e) =>
               setConfig((prev: any) => ({

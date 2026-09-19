@@ -1,5 +1,9 @@
 # AI Infinite Session
 
+<p align="center">
+  <img src="./logo.png" alt="AI Infinite Session logo" width="240" />
+</p>
+
 > A local-first chat agent that lets you work **comfortably and indefinitely**
 > with language models that have a narrow context window — without losing
 > track of the original prompt, the goal of the conversation, or important

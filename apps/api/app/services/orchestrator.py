@@ -550,7 +550,7 @@ def _wants_tools(user_message: str) -> bool:
     lowered = user_message.lower()
     hints = [
         # English
-        "tool", "mcp", "internet", "web", "search",
+        "tool", "mcp", "internet", "web", "search", "skill", "skills",
         "use ", "run ", "check ", "weather", "news",
         "price", "stock", "crypto", "btc", "bitcoin",
         "lookup", "find",
@@ -611,7 +611,7 @@ def _wants_tools(user_message: str) -> bool:
         "استخدم ", "تشغيل", "تحقق", "طقس", "أخبار",
         "سعر", "تشفير",
         # Ukrainian
-        "інструмент", "пошукай", "знайди", "виконай",
+        "інструмент", "скіл", "скіли", "навичк", "пошукай", "знайди", "виконай",
         "запусти", "перевір", "погод", "новин", "ціна",
     ]
     return any(h in lowered for h in hints) or _needs_fresh_or_local_info(user_message)

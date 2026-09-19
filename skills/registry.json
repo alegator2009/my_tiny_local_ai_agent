@@ -124,6 +124,30 @@
           "action": "Run the web-search-loop skill with query='OpenAI latest news' — the skill will rotate engines if Brave returns 0 results"
         }
       ]
+    },
+    "skill-author": {
+      "name": "skill-author",
+      "description": "Create, update, import, or list reusable agent skills in the local skill registry when the user explicitly asks.",
+      "whenToUse": "When the user explicitly asks to create a new skill, change an existing skill, import a supplied skill definition, or list available skills. Do not use merely because no existing skill matches.",
+      "instructions": [
+        "Confirm that the user explicitly requested a create, update, import, or list operation; ask only for missing details that materially affect the skill.",
+        "For a new or imported skill, prepare a concise definition with a lowercase hyphenated name, discriminating description, whenToUse guidance, and only the instructions needed for reliable execution.",
+        "Call the skill-author tool with action=create or action=import and the structured definition. Use action=update only when the user explicitly asks to change an existing skill.",
+        "Report the saved skill name and its intended use. Never overwrite an existing skill through create or import."
+      ],
+      "examples": [
+        {
+          "prompt": "Створи скіл для перевірки SQL-міграцій перед релізом",
+          "action": "Create a focused skill definition and save it with action=create."
+        },
+        {
+          "prompt": "Імпортуй цей JSON-скіл у агента",
+          "action": "Validate the supplied definition and save it with action=import."
+        }
+      ],
+      "admin": "registry",
+      "createdAt": "2026-09-19T00:00:00.000Z",
+      "updatedAt": "2026-09-19T00:00:00.000Z"
     }
   },
   "version": 2,
