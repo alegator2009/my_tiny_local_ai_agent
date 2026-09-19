@@ -2,7 +2,7 @@
 
 import { createPortal } from 'react-dom';
 import { Dispatch, FormEvent, SetStateAction, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import type {
@@ -35,24 +35,78 @@ const SKILL_DISPLAY_PREFIX = '🔧'; // marker for skill display line
 
 const THINKING_OPTIONS: ThinkingMode[] = ['off', 'low', 'medium', 'high'];
 
-function normalizeAssistantMarkdown(input: string): string {
-  const text = (input || '').replace(/\r\n?/g, '\n');
-  if (!text || text.includes('```')) {
-    return text;
-  }
+function formatCompactTable(source: string): string {
+  const cells = source.split('|').map((cell) => cell.trim());
+  const dividerStart = cells.findIndex(
+    (cell, index) =>
+      cell === '' &&
+      index > 0 &&
+      /^:?-{3,}:?$/.test(cells[index + 1] || '')
+  );
+  if (dividerStart < 2) return source;
 
-  return text
+  let columnCount = 0;
+  while (/^:?-{3,}:?$/.test(cells[dividerStart + 1 + columnCount] || '')) {
+    columnCount += 1;
+  }
+  if (columnCount < 2 || dividerStart < columnCount) return source;
+
+  const header = cells.slice(dividerStart - columnCount, dividerStart);
+  let cursor = dividerStart + columnCount + 1;
+  const rows: string[][] = [];
+  while (cursor < cells.length) {
+    while (cells[cursor] === '') cursor += 1;
+    const row = cells.slice(cursor, cursor + columnCount);
+    if (row.length !== columnCount || row.some((cell) => cell === '')) break;
+    rows.push(row);
+    cursor += columnCount;
+  }
+  if (rows.length === 0) return source;
+
+  const asRow = (row: string[]) => `| ${row.join(' | ')} |`;
+  return [asRow(header), asRow(cells.slice(dividerStart + 1, dividerStart + 1 + columnCount)), ...rows.map(asRow)].join('\n');
+}
+
+function normalizeAssistantMarkdown(input: string): string {
+  const codeBlocks: string[] = [];
+  let text = (input || '').replace(/\r\n?/g, '\n').replace(
+    /```([\w+-]*)(?:[ \t]+|\n)([\s\S]*?)```/g,
+    (_match, language: string, content: string) => {
+      const token = `\uE000CODE_BLOCK_${codeBlocks.length}\uE001`;
+      codeBlocks.push(`\n\n\`\`\`${language}\n${content.trim()}\n\`\`\`\n\n`);
+      return token;
+    }
+  );
+  if (!text) return text;
+
+  text = text
     .replace(/<\|?\/?tool_call\|?>/gi, '')
     .replace(/^\s*`?call:[^\n`]+`?\s*$/gim, '')
     .replace(/(^|\n)\s*call:([^\n]+)/g, '$1`call:$2`')
+    .replace(/([^\n])\s+---\s+(?=#{1,6}\s+)/g, '$1\n\n---\n\n')
     .replace(/\*\*\*\s*(#{1,6}\s+)/g, '\n\n$1')
     .replace(/([^\n])\s+(#{1,6}\s+)/g, '$1\n\n$2')
+    .replace(/(#{1,6}\s+[^\n|]+)\s+(\|(?=[^|\n]+\|))/g, '$1\n\n$2')
+    .replace(/([^\n])\s+(>\s+)/g, '$1\n\n$2')
     .replace(/([^\n])\s+(\d+\.\s+)/g, '$1\n$2')
     .replace(/([^\n])\s+([-*]\s+)/g, '$1\n$2')
     .replace(/([^\n])\s+(\*\*[^*\n]{2,120}:\*\*)/g, '$1\n\n$2')
+    .replace(/\|[\s\S]*?\|(?=\s*(?:>\s|---\s*(?:\n|#{1,6}\s)|#{1,6}\s|\d+\.\s|$))/g, (table) => (
+      table.includes('\n') || !table.includes('|---') ? table : formatCompactTable(table)
+    ))
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  return text.replace(/\uE000CODE_BLOCK_(\d+)\uE001/g, (_match, index: string) => codeBlocks[Number(index)] || '');
 }
+
+const markdownComponents: Components = {
+  table: ({ node: _node, children, ...props }) => (
+    <div className="markdown-table-scroll" role="region" aria-label="Table" tabIndex={0}>
+      <table {...props}>{children}</table>
+    </div>
+  ),
+};
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
@@ -961,7 +1015,7 @@ export default function ChatPanel({
                       <details className="msg-reasoning">
                         <summary>🧠 Agent reasoning</summary>
                         <div className="msg-reasoning-body">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {((m.content_json as any)?.reasoning_text) || 'Agent is thinking...'}
                           </ReactMarkdown>
                         </div>
@@ -972,7 +1026,7 @@ export default function ChatPanel({
                     ) : m.message_type === 'auto_search_event' ? (
                       <pre className="msg-auto-search">{m.content_text}</pre>
                     ) : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                         {m.role === 'assistant' ? normalizeAssistantMarkdown(((m.content_text || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/g, '').trim() || '...')) : m.content_text || '...'}
                       </ReactMarkdown>
                     )}

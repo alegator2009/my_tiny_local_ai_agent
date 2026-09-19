@@ -346,6 +346,8 @@ async def decide_search(
     freshness_hints: list[str] | None = None,
     factual_hints: list[str] | None = None,
     opinion_hints: list[str] | None = None,
+    jev_answer: ChoiceAnswer | None = None,
+    jev_evaluated: bool = False,
 ) -> SearchDecision:
     """Use Jev to refine the ``auto`` policy, with the old router as fallback.
 
@@ -368,24 +370,28 @@ async def decide_search(
         or force
         or not auto_cfg.enabled
         or not fallback.normalized_query
-        or not cfg.typesafe_config.is_ready()
     ):
         return fallback
 
-    answer = await evaluate_choice(
-        state={"user_message": user_message},
-        instructions=(
-            "Before the chat model responds, decide whether this user message needs a web search. "
-            "Choose search only for information that is current, externally verifiable, local, "
-            "or otherwise needs sources. Choose skip for casual conversation, writing, reasoning, "
-            "coding from supplied context, and questions answerable without current web facts."
-        ),
-        criteria={
-            "search": "A web lookup is needed before answering.",
-            "skip": "A web lookup is not needed before answering.",
-        },
-        config=cfg.typesafe_config,
-    )
+    # The global pre-turn router supplies this decision during normal chat
+    # turns.  Keep the standalone call for settings tests and other callers
+    # that do not run the global router.
+    answer = jev_answer
+    if answer is None and not jev_evaluated and cfg.typesafe_config.is_ready():
+        answer = await evaluate_choice(
+            state={"user_message": user_message},
+            instructions=(
+                "Before the chat model responds, decide whether this user message needs a web search. "
+                "Choose search only for information that is current, externally verifiable, local, "
+                "or otherwise needs sources. Choose skip for casual conversation, writing, reasoning, "
+                "coding from supplied context, and questions answerable without current web facts."
+            ),
+            criteria={
+                "search": "A web lookup is needed before answering.",
+                "skip": "A web lookup is not needed before answering.",
+            },
+            config=cfg.typesafe_config,
+        )
     if answer is None or answer.confidence < cfg.typesafe_config.min_confidence:
         return fallback
     return SearchDecision(
@@ -903,6 +909,7 @@ async def run_auto_search(
     user_message: str,
     *,
     cfg: AppConfig,
+    decision: SearchDecision | None = None,
     force: bool = False,
     bypass_cache: bool = False,
     request_timeout_sec: int | None = None,
@@ -935,14 +942,15 @@ async def run_auto_search(
     """
 
     auto_cfg: AutoSearchConfig = cfg.mcp_config.auto_search
-    decision = await decide_search(
-        user_message,
-        cfg=cfg,
-        force=force,
-        freshness_hints=auto_cfg.freshness_hints or None,
-        factual_hints=auto_cfg.factual_hints or None,
-        opinion_hints=auto_cfg.opinion_hints or None,
-    )
+    if decision is None:
+        decision = await decide_search(
+            user_message,
+            cfg=cfg,
+            force=force,
+            freshness_hints=auto_cfg.freshness_hints or None,
+            factual_hints=auto_cfg.factual_hints or None,
+            opinion_hints=auto_cfg.opinion_hints or None,
+        )
 
     # Try the LLM-based rewriter first.  It understands pronouns,
     # meta-commands ("Force web search") and one-word follow-ups much

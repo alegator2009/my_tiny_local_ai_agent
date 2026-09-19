@@ -13,6 +13,7 @@ from ..db import execute, fetch_all, fetch_one, utcnow_iso
 from ..storage import append_transcript_event, write_session_json
 from .artifacts import write_file_artifact
 from .indexing import estimate_token_count, index_message
+from .jev_router import route_turn as _route_with_jev
 from .memory import create_checkpoint, maybe_run_scheduled_wiki_lint, maybe_update_durable_facts, record_turn_entities, update_working_set
 from .memory import (
     _recent_messages,
@@ -1437,6 +1438,27 @@ def _auto_select_skill(user_content: str, *, threshold: int = 2) -> str | None:
     return None
 
 
+def _skill_choice_criteria() -> dict[str, str | None]:
+    """Return the closed skill set used by the global Jev router."""
+
+    criteria: dict[str, str | None] = {
+        "__no_matching_skill__": "No registered skill is clearly applicable to this request."
+    }
+    try:
+        from .skill_state import list_skills_in_registry, _load_skill  # noqa: WPS433
+
+        for name in list_skills_in_registry() or []:
+            skill = _load_skill(name)
+            if not isinstance(skill, dict):
+                continue
+            description = str(skill.get("description") or "").strip()
+            when_to_use = str(skill.get("whenToUse") or "").strip()
+            criteria[name] = " ".join(part for part in (description, when_to_use) if part) or None
+    except Exception:
+        pass
+    return criteria
+
+
 async def _auto_select_skill_with_jev(user_content: str, cfg: Any) -> str | None:
     """Let Jev make the bounded SKILL.state routing choice when configured.
 
@@ -1448,19 +1470,9 @@ async def _auto_select_skill_with_jev(user_content: str, cfg: Any) -> str | None
     if not cfg.typesafe_config.is_ready():
         return fallback
     try:
-        from .skill_state import list_skills_in_registry, _load_skill  # noqa: WPS433
         from .typesafe import evaluate_choice  # noqa: WPS433
 
-        criteria: dict[str, str | None] = {
-            "__no_matching_skill__": "No registered skill is clearly applicable to this request."
-        }
-        for name in list_skills_in_registry() or []:
-            skill = _load_skill(name)
-            if not isinstance(skill, dict):
-                continue
-            description = str(skill.get("description") or "").strip()
-            when_to_use = str(skill.get("whenToUse") or "").strip()
-            criteria[name] = " ".join(part for part in (description, when_to_use) if part) or None
+        criteria = _skill_choice_criteria()
         if len(criteria) == 1:
             return fallback
         answer = await evaluate_choice(
@@ -1762,13 +1774,48 @@ async def stream_chat(
             },
         )
 
+    auto_cfg = cfg.mcp_config.auto_search
+    auto_select = effective_context_mode == "skill_state"
+    explicit_skill = active_skill or _detect_active_skill(user_content)
+    terminal_fallback = _needs_console_tool(user_content)
+    file_fallback = _needs_file_tool(user_content)
+    mcp_fallback = _wants_tools(user_content) or terminal_fallback or file_fallback
+    skill_fallback = _auto_select_skill(user_content) if auto_select and explicit_skill is None else None
+    skill_criteria = _skill_choice_criteria() if auto_select and explicit_skill is None else None
+    use_jev_web_choice = bool(
+        auto_cfg.enabled and auto_cfg.policy == "auto" and not force_search
+    )
+    jev_plan = await _route_with_jev(
+        user_content,
+        cfg=cfg,
+        terminal_fallback=terminal_fallback,
+        file_fallback=file_fallback,
+        mcp_fallback=mcp_fallback,
+        skill_fallback=skill_fallback,
+        skill_criteria=skill_criteria,
+        include_web_search=use_jev_web_choice,
+    )
+    if jev_plan.jev_evaluated:
+        yield _sse(
+            "jev_routing",
+            {
+                "terminal": jev_plan.terminal_tool_enabled,
+                "file": jev_plan.file_tool_enabled,
+                "mcp": jev_plan.mcp_tools_enabled,
+                "skill": jev_plan.selected_skill or "",
+                "confidence": {
+                    key: round(answer.confidence, 3)
+                    for key, answer in jev_plan.decisions.items()
+                },
+            },
+        )
+
     # ------------------------------------------------------------------
     # Auto web search — the "google where I don't know" router.
     # Runs after the in-session retrieval and before the prompt is
     # assembled so the model sees grounded facts in the per-turn
     # section and can quote them instead of guessing.
     # ------------------------------------------------------------------
-    auto_cfg = cfg.mcp_config.auto_search
     from .auto_search import decide_search as _decide_auto_search
 
     auto_decision = await _decide_auto_search(
@@ -1778,6 +1825,8 @@ async def stream_chat(
         freshness_hints=auto_cfg.freshness_hints or None,
         factual_hints=auto_cfg.factual_hints or None,
         opinion_hints=auto_cfg.opinion_hints or None,
+        jev_answer=jev_plan.web_search_answer,
+        jev_evaluated=jev_plan.jev_evaluated and use_jev_web_choice,
     )
     auto_result: AutoSearchResult | None = None
     if auto_decision.should_search:
@@ -1805,6 +1854,7 @@ async def stream_chat(
             auto_result = await _run_auto_search(
                 user_content,
                 cfg=cfg,
+                decision=auto_decision,
                 force=force_search,
                 bypass_cache=bypass_search_cache,
                 recent_user_messages=recent_user_messages,
@@ -1890,9 +1940,9 @@ async def stream_chat(
             },
         )
 
-    terminal_tool_enabled = _needs_console_tool(user_content)
-    file_tool_enabled = _needs_file_tool(user_content)
-    user_wants_tools = _wants_tools(user_content) or terminal_tool_enabled or file_tool_enabled
+    terminal_tool_enabled = jev_plan.terminal_tool_enabled
+    file_tool_enabled = jev_plan.file_tool_enabled
+    user_wants_tools = jev_plan.mcp_tools_enabled
     mcp_registry: MCPToolRegistry | None = None
     mcp_tools_schema: list[dict[str, Any]] = []
     prompt_tool_lines: list[str] = []
@@ -1938,10 +1988,9 @@ async def stream_chat(
     #      opted into SKILL.state via ``context_mode == 'skill_state'``.
     #      In ``'full'`` mode the chat history stays in the prompt
     #      and the orchestrator never silently swaps it out.
-    auto_select = effective_context_mode == "skill_state"
-    detected_skill = active_skill or _detect_active_skill(user_content)
+    detected_skill = explicit_skill
     if detected_skill is None and auto_select:
-        detected_skill = await _auto_select_skill_with_jev(user_content, cfg)
+        detected_skill = jev_plan.selected_skill
     skill_bundle: dict[str, Any] | None = None
     if detected_skill:
         try:

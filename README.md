@@ -56,10 +56,11 @@ short-term summarisation and long-term memory work together.
   Startpage) and, if every external engine is down, to an in-process
   curated snapshot of common agentic-AI / no-code platforms.  The agent
   always has grounded citations to quote.
-- **Optional TypeSafe Jev routing.**  When enabled with a TypeSafe API token,
-  the Jev System One model makes narrow, typed `Choice` decisions: whether an
-  auto web search is needed and which SKILL.state skill fits a request.  It
-  never replaces the chat model.  Missing credentials, network failures and
+- **Optional TypeSafe Jev global routing.**  When enabled with a TypeSafe API
+  token, the Jev System One model makes one typed, confidence-gated pre-turn
+  plan for web search, terminal access, file artifacts, MCP tools and
+  SKILL.state selection. It never replaces the chat model or executes tools;
+  code retains control. Missing credentials, network failures and
   low-confidence results fall back to the existing deterministic heuristics.
 - **Stalled-session detector.**  When the assistant replies with three
   identical clarification requests in a row, the session is demoted to
@@ -254,25 +255,30 @@ SQLite table.
 ### TypeSafe Jev — optional semantic routing
 
 [TypeSafe Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
-is an optional System One decision model. The application sends it one narrow,
-typed `Choice` at a time; normal application code retains control of the
-workflow. Jev currently refines two decisions:
+is an optional System One decision model. The application sends independent,
+typed `Choice` decisions together in one pre-turn request; normal application
+code retains control of the workflow. Jev routes:
 
 1. In `auto` web-search policy, whether the incoming request needs current or
    externally verifiable information.
-2. In `skill_state` context mode, which registered skill best matches the
+2. Whether the chat model should receive terminal, file-artifact and registered
+   MCP tools for this turn.
+3. In `skill_state` context mode, which registered skill best matches the
    request, including an explicit “no matching skill” option.
 
 Configure it in **Settings → Global defaults → TypeSafe Jev**:
 
-1. Enable **Use Jev for routing choices**.
+1. Enable **Use Jev as the global turn router**.
 2. Paste a TypeSafe API token and save.
 3. Optionally tune the confidence threshold (default `0.70`) and timeout.
 
 The saved token is redacted from the settings response and stays server-side.
-Leaving Jev disabled, omitting the token, receiving a failed API request, or
-receiving a result below the configured confidence threshold preserves the
-same heuristic routing behaviour used before this integration.
+Jev can expose the terminal for a request such as “what is known about this
+computer”, but that terminal observes the API Docker container and mounted
+workspace—not the Windows host. Leaving Jev disabled, omitting the token,
+receiving a failed API request, or receiving a result below the configured
+confidence threshold preserves the same heuristic routing behaviour used before
+this integration.
 
 ### SKILL.state — bounded context for long-running tasks
 

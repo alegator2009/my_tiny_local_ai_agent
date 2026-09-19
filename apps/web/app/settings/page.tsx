@@ -1141,8 +1141,9 @@ export default function SettingsPage() {
 
         <h3>TypeSafe Jev — semantic choices</h3>
         <p className="small-muted">
-          Jev can make fast, typed routing choices for auto web search and SKILL.state selection. It never replaces your
-          chat model. Leave it disabled or leave the token blank to keep the current heuristic behaviour exactly as-is.
+          Jev makes one fast, typed pre-turn routing plan for web search, terminal, file artifacts, MCP tools and
+          SKILL.state selection. It never replaces your chat model or executes commands itself. Leave it disabled or
+          leave the token blank to keep the current heuristic behaviour exactly as-is.
         </p>
         <label className="inline-checkbox">
           <input
@@ -1161,7 +1162,7 @@ export default function SettingsPage() {
               }))
             }
           />
-          Use Jev for routing choices
+          Use Jev as the global turn router
         </label>
         <div className="provider-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
           <label style={{ gridColumn: '1 / -1' }}>
